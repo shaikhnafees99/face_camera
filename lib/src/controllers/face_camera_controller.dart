@@ -9,7 +9,6 @@ import '../handlers/enum_handler.dart';
 import '../handlers/face_identifier.dart';
 import '../utils/logger.dart';
 import 'face_camera_state.dart';
-import 'dart:math' as math;
 
 /// The controller for the [SmartFaceCamera] widget.
 class FaceCameraController extends ValueNotifier<FaceCameraState> {
@@ -85,48 +84,30 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
       }
     }
 
-    value = value.copyWith(
-        availableCameraLens: availableCameraLens,
-        currentCameraLens: currentCameraLens);
+    value = value.copyWith(availableCameraLens: availableCameraLens, currentCameraLens: currentCameraLens);
   }
 
   Future<void> _initCamera() async {
-    final cameras = FaceCamera.cameras
-        .where((c) =>
-            c.lensDirection ==
-            EnumHandler.cameraLensToCameraLensDirection(
-                value.availableCameraLens[value.currentCameraLens]))
-        .toList();
+    final cameras = FaceCamera.cameras.where((c) => c.lensDirection == EnumHandler.cameraLensToCameraLensDirection(value.availableCameraLens[value.currentCameraLens])).toList();
 
     if (cameras.isNotEmpty) {
-      final cameraController = CameraController(cameras.first,
-          EnumHandler.imageResolutionToResolutionPreset(imageResolution),
-          enableAudio: enableAudio,
-          imageFormatGroup: Platform.isAndroid
-              ? ImageFormatGroup.nv21
-              : ImageFormatGroup.bgra8888);
+      final cameraController = CameraController(cameras.first, EnumHandler.imageResolutionToResolutionPreset(imageResolution), enableAudio: enableAudio, imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.nv21 : ImageFormatGroup.bgra8888);
 
       await cameraController.initialize().whenComplete(() {
-        value = value.copyWith(
-            isInitialized: true, cameraController: cameraController);
+        value = value.copyWith(isInitialized: true, cameraController: cameraController);
       });
 
       await changeFlashMode(value.availableFlashMode.indexOf(defaultFlashMode));
 
-      await cameraController.lockCaptureOrientation(
-          EnumHandler.cameraOrientationToDeviceOrientation(orientation));
+      await cameraController.lockCaptureOrientation(EnumHandler.cameraOrientationToDeviceOrientation(orientation));
     }
 
     startImageStream();
   }
 
   Future<void> changeFlashMode([int? index]) async {
-    final newIndex =
-        index ?? (value.currentFlashMode + 1) % value.availableFlashMode.length;
-    await value.cameraController!
-        .setFlashMode(EnumHandler.cameraFlashModeToFlashMode(
-            value.availableFlashMode[newIndex]))
-        .then((_) {
+    final newIndex = index ?? (value.currentFlashMode + 1) % value.availableFlashMode.length;
+    await value.cameraController!.setFlashMode(EnumHandler.cameraFlashModeToFlashMode(value.availableFlashMode[newIndex])).then((_) {
       value = value.copyWith(currentFlashMode: newIndex);
     });
   }
@@ -141,9 +122,7 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
   }
 
   Future<void> changeCameraLens() async {
-    value = value.copyWith(
-        currentCameraLens:
-            (value.currentCameraLens + 1) % value.availableCameraLens.length);
+    value = value.copyWith(currentCameraLens: (value.currentCameraLens + 1) % value.availableCameraLens.length);
     _initCamera();
   }
 
@@ -193,8 +172,7 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
   }
 
   double _calculateLuminance(CameraImage image, Face? face) {
-    if(face == null) {
-      //YUV 포맷 기준 luminance 계산 (성능 최적화)
+    if (face == null) {
       final yPlane = image.planes[0].bytes;
       double sum = 0;
       for (int i = 0; i < yPlane.length; i += 2) {
@@ -203,26 +181,20 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
       return sum / (yPlane.length ~/ 2);
     }
 
-
     debugPrint('Calculating luminance for face rect: ${face.boundingBox.center}');
 
     final yPlane = image.planes[0].bytes;
-
-    // YUV420에서 Y 채널의 stride 고려
     final yStride = image.planes[0].bytesPerRow;
 
     final faceRect = face.boundingBox;
-
-    // 얼굴 영역 좌표 변환 (정규화 → 픽셀 단위)
-    final x = face.boundingBox.left.toInt().clamp(0, image.width-1);
-    final y = face.boundingBox.top.toInt().clamp(0, image.height-1);
-    final w = face.boundingBox.width.toInt().clamp(1, image.width-x);
-    final h = face.boundingBox.height.toInt().clamp(1, image.height-y);
+    final x = face.boundingBox.left.toInt().clamp(0, image.width - 1);
+    final y = face.boundingBox.top.toInt().clamp(0, image.height - 1);
+    final w = face.boundingBox.width.toInt().clamp(1, image.width - x);
+    final h = face.boundingBox.height.toInt().clamp(1, image.height - y);
 
     double sum = 0;
     int pixelCount = 0;
 
-    // 얼굴 영역만 순회 (성능을 위해 stride=2)
     for (int row = y; row < y + h; row += 2) {
       for (int col = x; col < x + w; col += 2) {
         final pos = row * yStride + col;
@@ -241,16 +213,8 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
     if (!value.alreadyCheckingImage) {
       value = value.copyWith(alreadyCheckingImage: true);
       try {
-        await FaceIdentifier.scanImage(
-                cameraImage: cameraImage,
-                controller: cameraController,
-                performanceMode: performanceMode,
-                faceSizeThreshold: faceSizeThreshold,
-                centerMargin: centerMargin
-        )
-            .then((result) async {
+        await FaceIdentifier.scanImage(cameraImage: cameraImage, controller: cameraController, performanceMode: performanceMode, faceSizeThreshold: faceSizeThreshold, centerMargin: centerMargin).then((result) async {
           value = value.copyWith(detectedFace: result);
-
 
           final frameLuminance = _calculateLuminance(cameraImage, null);
 
@@ -263,8 +227,7 @@ class FaceCameraController extends ValueNotifier<FaceCameraState> {
               if (result.face != null) {
                 onFaceDetected?.call(result.face);
               }
-              if (autoCapture &&
-                  (result.wellPositioned || ignoreFacePositioning)) {
+              if (autoCapture && (result.wellPositioned || ignoreFacePositioning)) {
                 captureImage();
               }
             } catch (e) {
